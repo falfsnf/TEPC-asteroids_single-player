@@ -48,6 +48,25 @@ class Bullet(pg.sprite.Sprite):
         self.rect.center = (int(self.pos.x), int(self.pos.y))
 
 
+class PowerUp(pg.sprite.Sprite):
+    """Power-up that can be picked up by the player."""
+
+    def __init__(self, pos: Vec, type: str = "freeze") -> None:
+        super().__init__()
+        self.pos = Vec(pos)
+        self.type = type
+        self.ttl = float(C.FREEZE_POWERUP_TTL)
+        self.r = int(C.FREEZE_POWERUP_RADIUS)
+        self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
+
+    def update(self, dt: float) -> None:
+        self.ttl -= dt
+        if self.ttl <= 0.0:
+            self.kill()
+            return
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+
+
 class Asteroid(pg.sprite.Sprite):
     """Asteroid with irregular polygon shape."""
 

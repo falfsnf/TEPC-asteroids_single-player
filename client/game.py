@@ -117,6 +117,7 @@ class Game:
             self.world.wave,
             self.scene,
             ship=self.world.get_ship(C.LOCAL_PLAYER_ID),
+            freeze_timer=self.world.freeze_timer,
         )
         pg.display.flip()
 

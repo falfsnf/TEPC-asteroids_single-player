@@ -1,12 +1,12 @@
 """Collision detection and resolution."""
 
 from dataclasses import dataclass, field
-from random import uniform
+from random import random, uniform
 
 import pygame as pg
 
 from core import config as C
-from core.entities import Asteroid, Bullet, Ship, UFO, UFO_BULLET_OWNER, PlayerId
+from core.entities import Asteroid, Bullet, Ship, UFO, UFO_BULLET_OWNER, PlayerId, PowerUp
 from core.utils import Vec, rand_unit_vec
 
 
@@ -18,6 +18,8 @@ class CollisionResult:
     score_deltas: dict[PlayerId, int] = field(default_factory=dict)
     ship_deaths: list[PlayerId] = field(default_factory=list)
     asteroids_to_spawn: list[tuple[Vec, Vec, str]] = field(default_factory=list)
+    powerups_to_spawn: list[tuple[Vec, str]] = field(default_factory=list)
+    powerup_collected: list[tuple[PlayerId, str]] = field(default_factory=list)
 
 
 class CollisionManager:
@@ -29,6 +31,7 @@ class CollisionManager:
         bullets: pg.sprite.Group,
         asteroids: pg.sprite.Group,
         ufos: pg.sprite.Group,
+        powerups: pg.sprite.Group,
     ) -> CollisionResult:
         result = CollisionResult()
         self._bullets_vs_asteroids(bullets, asteroids, result)
@@ -36,9 +39,23 @@ class CollisionManager:
         self._ufo_vs_asteroids(ufos, asteroids, result)
         self._ship_vs_asteroids(ships, asteroids, result)
         self._ship_vs_ufo_bullets(ships, bullets, result)
+        self._ship_vs_powerups(ships, powerups, result)
         return result
 
+    def _ship_vs_powerups(
+        self,
+        ships: dict[PlayerId, Ship],
+        powerups: pg.sprite.Group,
+        result: CollisionResult,
+    ) -> None:
+        for ship in ships.values():
+            for pu in list(powerups):
+                if (pu.pos - ship.pos).length() < (pu.r + ship.r):
+                    result.powerup_collected.append((ship.player_id, pu.type))
+                    pu.kill()
+
     def _bullets_vs_asteroids(
+
         self,
         bullets: pg.sprite.Group,
         asteroids: pg.sprite.Group,
@@ -164,6 +181,9 @@ class CollisionManager:
         ast.kill()
 
         result.events.append("asteroid_explosion")
+
+        if random() < C.FREEZE_POWERUP_CHANCE:
+            result.powerups_to_spawn.append((pos, "freeze"))
 
         for new_size in split:
             dirv = rand_unit_vec()
