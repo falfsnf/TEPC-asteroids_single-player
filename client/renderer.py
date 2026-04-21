@@ -1,10 +1,13 @@
 """Client-side rendering (pygame)."""
 
+import math
+
 import pygame as pg
 
 from core import config as C
-from core.entities import Asteroid, Bullet, Ship, UFO, PowerUp
+from core.entities import Asteroid, BlackHole, Bullet, Ship, UFO, PowerUp
 from core.scene import SceneState
+from core.utils import draw_image
 
 
 class Renderer:
@@ -28,6 +31,7 @@ class Renderer:
             Ship: self._draw_ship,
             UFO: self._draw_ufo,
             PowerUp: self._draw_powerup,
+            BlackHole: self._draw_black_hole,
         }
 
     def clear(self) -> None:
@@ -142,6 +146,43 @@ class Renderer:
                 ship.r + 6,
                 width=1,
             )
+
+    def _draw_black_hole(self, bh: BlackHole) -> None:
+        center = (int(bh.pos.x), int(bh.pos.y))
+
+        # Faint outer influence ring (so the player sees the danger zone).
+        pg.draw.circle(
+            self.screen,
+            (60, 60, 80),
+            center,
+            int(bh.influence_r),
+            width=1,
+        )
+
+        # Pulsing accretion rings between influence and event horizon.
+        t = bh.age
+        for i in range(3):
+            phase = (t * 0.6 + i * 0.33) % 1.0
+            ring_r = int(bh.r + 6 + phase * (bh.influence_r - bh.r - 6) * 0.4)
+            # Fade as the ring expands outward.
+            brightness = int(180 * (1.0 - phase))
+            color = (brightness, brightness, min(255, brightness + 30))
+            pg.draw.circle(self.screen, color, center, ring_r, width=1)
+
+        # Solid black disk (swallows what's behind it visually).
+        pg.draw.circle(self.screen, self.config.BLACK, center, bh.r)
+
+        # Bright event-horizon ring.
+        pg.draw.circle(self.screen, self.config.WHITE, center, bh.r, width=2)
+
+        # Inner swirl: a small rotating tick mark to give it motion.
+        ang = t * 4.0
+        inner_r = max(2, bh.r // 2)
+        tip = (
+            int(bh.pos.x + math.cos(ang) * inner_r),
+            int(bh.pos.y + math.sin(ang) * inner_r),
+        )
+        pg.draw.line(self.screen, self.config.WHITE, center, tip, 1)
 
     def _draw_ufo(self, ufo: UFO) -> None:
         width = ufo.r * 2

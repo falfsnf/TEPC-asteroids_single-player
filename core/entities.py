@@ -8,9 +8,26 @@ import pygame as pg
 from core import config as C
 from core.commands import PlayerCommand
 from core.utils import Vec, angle_to_vec, wrap_pos
+import os
+from enum import Enum
 
 PlayerId = int
 UFO_BULLET_OWNER = -10
+
+
+class EnumPowerUps(Enum):
+    """File paths for power up images"""
+
+    ONE_UP = os.path.join(C.IMAGES_PATH, "One_Up.png")
+
+    @classmethod
+    def _missing_(cls, value):
+        # If not valid value, return MISSING
+        MISSING = os.path.join(C.IMAGES_PATH, "Missing.png")
+        for member in cls:
+            if member.value == value:
+                return member
+        return MISSING
 
 
 def rotate_vec(v: Vec, deg: float) -> Vec:
@@ -115,6 +132,9 @@ class Ship(pg.sprite.Sprite):
         self.shield_energy = float(C.SHIELD_MAX_ENERGY)
         self.shield_activate = False
         self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
+
+        self.powerup = None
+        self.powerup_duration = 0
 
     def apply_command(
         self,
@@ -346,3 +366,88 @@ class UFO(pg.sprite.Sprite):
         self.cool = float(rate)
 
         return Bullet(UFO_BULLET_OWNER, self.pos, vel, ttl=ttl)
+
+
+class PowerUp(pg.sprite.Sprite):
+    """Initialize a Powerup"""
+
+    def __init__(self, pos: Vec, power_up_type: str):
+        super().__init__()
+        self.pos = Vec(pos)
+        self.type = power_up_type
+        self.image = pg.image.load(EnumPowerUps[self.type].value).convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.topleft = self.pos.x, self.pos.y
+        self.idle_time = 1
+        self.state = "down"  # just for idle animation
+
+    def update(self, dt: float):
+        """Animate the power up"""
+        if self.idle_time > 0:
+            self.idle_time -= dt
+
+        else:
+            if self.state == "down":
+                self.pos.y -= 5
+                self.state = "up"
+
+            elif self.state == "up":
+                self.pos.y += 5
+                self.state = "down"
+
+            self.idle_time = 1
+
+            self.pos = wrap_pos(self.pos)
+            self.rect.topleft = self.pos
+class BlackHole(pg.sprite.Sprite):
+    """Black hole hazard.
+
+    - Cannot be hit or destroyed (bullets and asteroids ignore it).
+    - Exists for a short, random lifetime (see config).
+    - Applies a gravitational pull on ships within its influence radius,
+      stronger the closer the ship is.
+    - Touching it (within event-horizon radius) is instant Game Over.
+    """
+
+    def __init__(self, pos: Vec, lifetime: float) -> None:
+        super().__init__()
+        self.pos = Vec(pos)
+        self.lifetime = float(lifetime)
+        self.age = 0.0
+        self.r = int(C.BLACK_HOLE_RADIUS)
+        self.influence_r = float(C.BLACK_HOLE_INFLUENCE_RADIUS)
+        self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+
+    def update(self, dt: float) -> None:
+        self.age += dt
+        if self.age >= self.lifetime:
+            self.kill()
+            return
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+
+    def pull_acceleration(self, target_pos: Vec) -> Vec:
+        """Return the acceleration vector the black hole applies on a point.
+
+        Force grows as the target approaches, following an inverse-square-like
+        falloff, capped at BLACK_HOLE_MAX_FORCE. Returns a zero vector if the
+        target is outside the influence radius.
+        """
+        to_hole = self.pos - target_pos
+        dist = to_hole.length()
+
+        if dist >= self.influence_r:
+            return Vec(0, 0)
+
+        # Avoid singularity when the ship is essentially on top of the hole.
+        # The collision check will handle this frame.
+        safe_dist = max(dist, float(self.r))
+
+        # Inverse-square falloff with a cap.
+        mag = C.BLACK_HOLE_PULL_STRENGTH / (safe_dist * safe_dist) * 10000.0
+        mag = min(mag, C.BLACK_HOLE_MAX_FORCE)
+
+        if dist < 1e-6:
+            return Vec(0, 0)
+
+        return to_hole.normalize() * mag
