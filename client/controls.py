@@ -25,6 +25,7 @@ class InputMapper:
         rotate_left = keys[pg.K_LEFT] or keys[pg.K_a]
         rotate_right = keys[pg.K_RIGHT] or keys[pg.K_d]
         thrust = keys[pg.K_UP] or keys[pg.K_w]
+        shield = keys[pg.K_LCTRL]
 
         cmd = PlayerCommand(
             rotate_left=rotate_left,
@@ -32,6 +33,7 @@ class InputMapper:
             thrust=thrust,
             shoot=self._shoot_pressed,
             hyperspace=self._hyper_pressed,
+            shield=shield,
         )
 
         self._shoot_pressed = False

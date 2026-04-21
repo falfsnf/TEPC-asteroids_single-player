@@ -9,7 +9,7 @@ import pygame as pg
 from core import config as C
 from core.collisions import CollisionManager
 from core.commands import PlayerCommand
-from core.entities import Asteroid, Ship, UFO, PowerUp, EnumPowerUps
+from core.entities import Asteroid, BlackHole, Ship, UFO, PowerUp, EnumPowerUps
 from core.utils import Vec, rand_edge_pos
 
 PlayerId = int
@@ -29,6 +29,7 @@ class World:
         self.asteroids = pg.sprite.Group()
         self.ufos = pg.sprite.Group()
         self.powerups = pg.sprite.Group()
+        self.black_holes = pg.sprite.Group()
         self.all_sprites = pg.sprite.Group()
 
         self.scores: Dict[PlayerId, int] = {}
@@ -36,6 +37,9 @@ class World:
         self.wave = 0
         self.wave_cool = float(C.WAVE_DELAY)
         self.ufo_timer = float(C.UFO_SPAWN_EVERY)
+        self.black_hole_timer = uniform(
+            C.BLACK_HOLE_SPAWN_EVERY_MIN, C.BLACK_HOLE_SPAWN_EVERY_MAX
+        )
 
         self.events: list[str] = []
         self._collision_mgr = CollisionManager()
@@ -105,6 +109,34 @@ class World:
         pw_up = PowerUp(pos, power_up)
         self.powerups.add(pw_up)
         self.all_sprites.add(pw_up)
+    def spawn_black_hole(self) -> None:
+        """Spawn a black hole at a random position, not too close to ships."""
+        ship_positions = [s.pos for s in self.ships.values()]
+        margin = C.BLACK_HOLE_RADIUS * 2
+
+        # Try a few times to find a safe position; fall back to any if needed.
+        pos = Vec(
+            uniform(margin, C.WIDTH - margin),
+            uniform(margin, C.HEIGHT - margin),
+        )
+        for _ in range(10):
+            if all(
+                (pos - sp).length() >= C.BLACK_HOLE_MIN_SPAWN_DIST
+                for sp in ship_positions
+            ):
+                break
+            pos = Vec(
+                uniform(margin, C.WIDTH - margin),
+                uniform(margin, C.HEIGHT - margin),
+            )
+
+        lifetime = uniform(
+            C.BLACK_HOLE_LIFETIME_MIN, C.BLACK_HOLE_LIFETIME_MAX
+        )
+        bh = BlackHole(pos, lifetime)
+        self.black_holes.add(bh)
+        self.all_sprites.add(bh)
+        self.events.append("black_hole_spawn")
 
     def update(
         self,
@@ -117,6 +149,7 @@ class World:
             return
 
         self._apply_commands(dt, commands_by_player_id)
+        self._apply_black_hole_pull(dt)
         self.all_sprites.update(dt)
 
         self._update_ufos(dt)
@@ -145,6 +178,17 @@ class World:
                 self.bullets.add(bullet)
                 self.all_sprites.add(bullet)
                 self.events.append("player_shoot")
+
+    def _apply_black_hole_pull(self, dt: float) -> None:
+        """Integrate gravitational pull from all black holes into ship velocity."""
+        if not self.black_holes:
+            return
+        for ship in self.ships.values():
+            total_accel = Vec(0, 0)
+            for bh in self.black_holes:
+                total_accel += bh.pull_acceleration(ship.pos)
+            if total_accel.length_squared() > 0:
+                ship.vel += total_accel * dt
 
     def _update_ufos(self, dt: float) -> None:
         for ufo in list(self.ufos):
@@ -180,6 +224,13 @@ class World:
             self.spawn_ufo()
             self.ufo_timer = float(C.UFO_SPAWN_EVERY)
 
+        self.black_hole_timer -= dt
+        if self.black_hole_timer <= 0.0:
+            self.spawn_black_hole()
+            self.black_hole_timer = uniform(
+                C.BLACK_HOLE_SPAWN_EVERY_MIN, C.BLACK_HOLE_SPAWN_EVERY_MAX
+            )
+
     def _maybe_start_next_wave(self, dt: float) -> None:
         if self.asteroids:
             return
@@ -191,11 +242,7 @@ class World:
 
     def _handle_collisions(self) -> None:
         result = self._collision_mgr.resolve(
-            self.ships,
-            self.bullets,
-            self.asteroids,
-            self.ufos,
-            self.powerups,
+            self.ships, self.bullets, self.asteroids, self.ufos, self.black_holes,  self.powerups
         )
 
         self.events.extend(result.events)
@@ -218,6 +265,11 @@ class World:
             if ship is not None:
                 self._ship_die(ship)
 
+        for player_id in result.instant_deaths:
+            ship = self.get_ship(player_id)
+            if ship is not None:
+                self._ship_die_instant(ship)
+
     def _ship_die(self, ship: Ship) -> None:
         pid = ship.player_id
         self.lives[pid] = self.lives[pid] - 1
@@ -235,3 +287,10 @@ class World:
         if powerup_type == "ONE_UP":
             pid = ship.player_id
             self.lives[pid] += 1
+    def _ship_die_instant(self, ship: Ship) -> None:
+        """Instant Game Over: remaining lives are forfeit (black hole)."""
+        pid = ship.player_id
+        self.lives[pid] = 0
+        ship.vel.xy = (0, 0)
+        if all(v <= 0 for v in self.lives.values()):
+            self.game_over = True

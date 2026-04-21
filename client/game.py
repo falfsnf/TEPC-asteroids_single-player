@@ -116,6 +116,7 @@ class Game:
             self.world.lives.get(C.LOCAL_PLAYER_ID, 0),
             self.world.wave,
             self.scene,
+            ship=self.world.get_ship(C.LOCAL_PLAYER_ID),
         )
         pg.display.flip()
 

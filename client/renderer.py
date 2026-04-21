@@ -1,9 +1,11 @@
 """Client-side rendering (pygame)."""
 
+import math
+
 import pygame as pg
 
 from core import config as C
-from core.entities import Asteroid, Bullet, Ship, UFO, PowerUp
+from core.entities import Asteroid, BlackHole, Bullet, Ship, UFO, PowerUp
 from core.scene import SceneState
 from core.utils import draw_image
 
@@ -29,6 +31,7 @@ class Renderer:
             Ship: self._draw_ship,
             UFO: self._draw_ufo,
             PowerUp: self._draw_powerup,
+            BlackHole: self._draw_black_hole,
         }
 
     def clear(self) -> None:
@@ -47,6 +50,7 @@ class Renderer:
         lives: int,
         wave: int,
         state: SceneState,
+        ship = None
     ) -> None:
         if state != SceneState.PLAY:
             return
@@ -54,6 +58,9 @@ class Renderer:
         text = f"SCORE {score:06d}   LIVES {lives}   WAVE {wave}"
         label = self.font.render(text, True, self.config.WHITE)
         self.screen.blit(label, (10, 10))
+
+        if ship is not None:
+            self._draw_shield_bar(ship)
 
     def draw_menu(self) -> None:
         self._draw_text(
@@ -120,6 +127,10 @@ class Renderer:
         ]
         pg.draw.polygon(self.screen, self.config.WHITE, points, width=1)
 
+        if ship.shield_active:
+            center = (int(ship.pos.x), int(ship.pos.y))
+            pg.draw.circle(self.screen, self.config.WHITE, center, ship.r + 10, width=2)
+
         if ship.invuln > 0.0 and int(ship.invuln * 10) % 2 == 0:
             center = (int(ship.pos.x), int(ship.pos.y))
             pg.draw.circle(
@@ -129,6 +140,43 @@ class Renderer:
                 ship.r + 6,
                 width=1,
             )
+
+    def _draw_black_hole(self, bh: BlackHole) -> None:
+        center = (int(bh.pos.x), int(bh.pos.y))
+
+        # Faint outer influence ring (so the player sees the danger zone).
+        pg.draw.circle(
+            self.screen,
+            (60, 60, 80),
+            center,
+            int(bh.influence_r),
+            width=1,
+        )
+
+        # Pulsing accretion rings between influence and event horizon.
+        t = bh.age
+        for i in range(3):
+            phase = (t * 0.6 + i * 0.33) % 1.0
+            ring_r = int(bh.r + 6 + phase * (bh.influence_r - bh.r - 6) * 0.4)
+            # Fade as the ring expands outward.
+            brightness = int(180 * (1.0 - phase))
+            color = (brightness, brightness, min(255, brightness + 30))
+            pg.draw.circle(self.screen, color, center, ring_r, width=1)
+
+        # Solid black disk (swallows what's behind it visually).
+        pg.draw.circle(self.screen, self.config.BLACK, center, bh.r)
+
+        # Bright event-horizon ring.
+        pg.draw.circle(self.screen, self.config.WHITE, center, bh.r, width=2)
+
+        # Inner swirl: a small rotating tick mark to give it motion.
+        ang = t * 4.0
+        inner_r = max(2, bh.r // 2)
+        tip = (
+            int(bh.pos.x + math.cos(ang) * inner_r),
+            int(bh.pos.y + math.sin(ang) * inner_r),
+        )
+        pg.draw.line(self.screen, self.config.WHITE, center, tip, 1)
 
     def _draw_ufo(self, ufo: UFO) -> None:
         width = ufo.r * 2
@@ -145,3 +193,25 @@ class Renderer:
     def _draw_powerup(self, powerup: PowerUp):
         draw_image(self.screen, powerup.pos, powerup.image)
         # pg.draw.rect(surf, C.WHITE, self.rect, width=1)
+    def _draw_shield_bar(self, ship) -> None:
+        bar_x      = 10
+        bar_y      = 36        
+        bar_width  = 120
+        bar_height = 8
+
+        ratio = ship.shield_energy / self.config.SHIELD_MAX_ENERGY
+        fill  = int(bar_width * ratio)
+
+        pg.draw.rect(self.screen, (80, 80, 80),
+                    (bar_x, bar_y, bar_width, bar_height))
+
+        if fill > 0:
+            color = self.config.WHITE if not ship.shield_active else (100, 180, 255)
+            pg.draw.rect(self.screen, color,
+                        (bar_x, bar_y, fill, bar_height))
+
+        pg.draw.rect(self.screen, self.config.WHITE,
+                    (bar_x, bar_y, bar_width, bar_height), width=1)
+
+        label = self.font.render("SH", True, self.config.WHITE)
+        self.screen.blit(label, (bar_x + bar_width + 6, bar_y - 4))
