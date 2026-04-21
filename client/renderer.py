@@ -50,7 +50,8 @@ class Renderer:
         lives: int,
         wave: int,
         state: SceneState,
-        ship = None
+        ship = None,
+        freeze_timer = 0.0
     ) -> None:
         if state != SceneState.PLAY:
             return
@@ -58,6 +59,11 @@ class Renderer:
         text = f"SCORE {score:06d}   LIVES {lives}   WAVE {wave}"
         label = self.font.render(text, True, self.config.WHITE)
         self.screen.blit(label, (10, 10))
+
+        if freeze_timer > 0.0:
+            f_text = f"FROZEN {freeze_timer:.1f}s"
+            f_label = self.font.render(f_text, True, (100, 200, 255))
+            self.screen.blit(f_label, (self.config.WIDTH - 200, 10))
 
         if ship is not None:
             self._draw_shield_bar(ship)
@@ -190,9 +196,19 @@ class Renderer:
         cup.center = (int(ufo.pos.x), int(ufo.pos.y - height * 0.3))
         pg.draw.ellipse(self.screen, self.config.WHITE, cup, width=1)
 
-    def _draw_powerup(self, powerup: PowerUp):
-        draw_image(self.screen, powerup.pos, powerup.image)
-        # pg.draw.rect(surf, C.WHITE, self.rect, width=1)
+    def _draw_powerup(self, powerup: PowerUp) -> None:
+        center = (int(powerup.pos.x), int(powerup.pos.y))
+        r = powerup.r
+        points = [
+            (center[0], center[1] - r),
+            (center[0] + r, center[1]),
+            (center[0], center[1] + r),
+            (center[0] - r, center[1]),
+        ]
+        color = (100, 200, 255) if powerup.type == "freeze" else self.config.WHITE
+        pg.draw.polygon(self.screen, color, points, width=2)
+        pg.draw.circle(self.screen, color, center, r // 2, width=1)
+
     def _draw_shield_bar(self, ship) -> None:
         bar_x      = 10
         bar_y      = 36        
