@@ -74,6 +74,9 @@ class World:
 
         ship_positions = [s.pos for s in self.ships.values()]
 
+        for ship in self.ships.values():
+            ship.shotgun_available = True
+
         for _ in range(count):
             pos = rand_edge_pos()
             while any(
@@ -109,12 +112,11 @@ class World:
         pw_up = PowerUp(pos, power_up)
         self.powerups.add(pw_up)
         self.all_sprites.add(pw_up)
+
     def spawn_black_hole(self) -> None:
-        """Spawn a black hole at a random position, not too close to ships."""
         ship_positions = [s.pos for s in self.ships.values()]
         margin = C.BLACK_HOLE_RADIUS * 2
 
-        # Try a few times to find a safe position; fall back to any if needed.
         pos = Vec(
             uniform(margin, C.WIDTH - margin),
             uniform(margin, C.HEIGHT - margin),
@@ -175,12 +177,16 @@ class World:
 
             bullet = ship.apply_command(cmd, dt, self.bullets)
             if bullet is not None:
-                self.bullets.add(bullet)
-                self.all_sprites.add(bullet)
+                if isinstance(bullet, list):
+                    for b in bullet:
+                        self.bullets.add(b)
+                        self.all_sprites.add(b)
+                else:
+                    self.bullets.add(bullet)
+                    self.all_sprites.add(bullet)
                 self.events.append("player_shoot")
 
     def _apply_black_hole_pull(self, dt: float) -> None:
-        """Integrate gravitational pull from all black holes into ship velocity."""
         if not self.black_holes:
             return
         for ship in self.ships.values():
@@ -208,7 +214,6 @@ class World:
                 self.ufos.remove(ufo)
 
     def _get_nearest_ship_pos(self, from_pos: Vec) -> Vec | None:
-        """Return position of the nearest living ship to from_pos."""
         nearest = None
         min_dist = float("inf")
         for ship in self.ships.values():
@@ -287,8 +292,8 @@ class World:
         if powerup_type == "ONE_UP":
             pid = ship.player_id
             self.lives[pid] += 1
+
     def _ship_die_instant(self, ship: Ship) -> None:
-        """Instant Game Over: remaining lives are forfeit (black hole)."""
         pid = ship.player_id
         self.lives[pid] = 0
         ship.vel.xy = (0, 0)
