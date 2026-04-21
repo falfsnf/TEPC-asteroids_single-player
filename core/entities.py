@@ -8,9 +8,26 @@ import pygame as pg
 from core import config as C
 from core.commands import PlayerCommand
 from core.utils import Vec, angle_to_vec, wrap_pos
+import os
+from enum import Enum
 
 PlayerId = int
 UFO_BULLET_OWNER = -10
+
+
+class EnumPowerUps(Enum):
+    """File paths for power up images"""
+
+    ONE_UP = os.path.join(C.IMAGES_PATH, "One_Up.png")
+
+    @classmethod
+    def _missing_(cls, value):
+        # If not valid value, return MISSING
+        MISSING = os.path.join(C.IMAGES_PATH, "Missing.png")
+        for member in cls:
+            if member.value == value:
+                return member
+        return MISSING
 
 
 def rotate_vec(v: Vec, deg: float) -> Vec:
@@ -94,6 +111,9 @@ class Ship(pg.sprite.Sprite):
         self.invuln = 0.0
         self.r = int(C.SHIP_RADIUS)
         self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
+
+        self.powerup = None
+        self.powerup_duration = 0
 
     def apply_command(
         self,
@@ -313,3 +333,36 @@ class UFO(pg.sprite.Sprite):
         self.cool = float(rate)
 
         return Bullet(UFO_BULLET_OWNER, self.pos, vel, ttl=ttl)
+
+
+class PowerUp(pg.sprite.Sprite):
+    """Initialize a Powerup"""
+
+    def __init__(self, pos: Vec, power_up_type: str):
+        super().__init__()
+        self.pos = Vec(pos)
+        self.type = power_up_type
+        self.image = pg.image.load(EnumPowerUps[self.type].value).convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.topleft = self.pos.x, self.pos.y
+        self.idle_time = 1
+        self.state = "down"  # just for idle animation
+
+    def update(self, dt: float):
+        """Animate the power up"""
+        if self.idle_time > 0:
+            self.idle_time -= dt
+
+        else:
+            if self.state == "down":
+                self.pos.y -= 5
+                self.state = "up"
+
+            elif self.state == "up":
+                self.pos.y += 5
+                self.state = "down"
+
+            self.idle_time = 1
+
+            self.pos = wrap_pos(self.pos)
+            self.rect.topleft = self.pos

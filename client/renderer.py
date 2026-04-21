@@ -3,8 +3,9 @@
 import pygame as pg
 
 from core import config as C
-from core.entities import Asteroid, Bullet, Ship, UFO
+from core.entities import Asteroid, Bullet, Ship, UFO, PowerUp
 from core.scene import SceneState
+from core.utils import draw_image
 
 
 class Renderer:
@@ -27,6 +28,7 @@ class Renderer:
             Asteroid: self._draw_asteroid,
             Ship: self._draw_ship,
             UFO: self._draw_ufo,
+            PowerUp: self._draw_powerup,
         }
 
     def clear(self) -> None:
@@ -139,3 +141,7 @@ class Renderer:
         cup = pg.Rect(0, 0, int(width * 0.5), int(height * 0.7))
         cup.center = (int(ufo.pos.x), int(ufo.pos.y - height * 0.3))
         pg.draw.ellipse(self.screen, self.config.WHITE, cup, width=1)
+
+    def _draw_powerup(self, powerup: PowerUp):
+        draw_image(self.screen, powerup.pos, powerup.image)
+        # pg.draw.rect(surf, C.WHITE, self.rect, width=1)

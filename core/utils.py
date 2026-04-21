@@ -5,8 +5,10 @@ from random import random, uniform
 from typing import Iterable
 
 import pygame as pg
+import os
 
 from core import config as C
+from core import entities
 
 Vec = pg.math.Vector2
 
@@ -53,3 +55,32 @@ def draw_text(
 ) -> None:
     label = font.render(text, True, C.WHITE)
     surface.blit(label, (x, y))
+
+
+def draw_image(
+    surface: pg.Surface,
+    pos: Vec,
+    image: pg.Surface | str = None,
+    new_res: tuple | None = None,
+):
+    """
+    Draws an image
+    :param surface: Surface to draw on
+    :param pos: In what position to draw on
+    :param image: can be an already loaded image or a path to an image
+    :param new_res: (width, height) for new resolution of image.
+    """
+    if not image:
+        image = os.path.join(C.IMAGES_PATH, "Missing.png")
+
+    if not isinstance(image, pg.Surface):
+        if isinstance(image, entities.EnumPowerUps):
+            image = image.value
+
+        image = pg.image.load(image).convert_alpha()
+
+    if new_res:
+        image = pg.transform.scale(image, new_res)
+
+    surface.blit(image, pos)
+    return image

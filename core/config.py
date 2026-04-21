@@ -78,6 +78,7 @@ RANDOM_SEED = None
 # config.py lives in core/, so we go one level up to the project root.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOUND_PATH = os.path.join(BASE_DIR, "assets", "sounds")
+IMAGES_PATH = os.path.join(BASE_DIR, "assets", "images")
 
 # Sounds
 PLAYER_SHOOT = "player_shoot.wav"

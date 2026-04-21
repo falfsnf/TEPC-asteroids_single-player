@@ -6,7 +6,7 @@ from random import uniform
 import pygame as pg
 
 from core import config as C
-from core.entities import Asteroid, Bullet, Ship, UFO, UFO_BULLET_OWNER, PlayerId
+from core.entities import Asteroid, Ship, UFO, UFO_BULLET_OWNER, PlayerId, PowerUp
 from core.utils import Vec, rand_unit_vec
 
 
@@ -18,6 +18,8 @@ class CollisionResult:
     score_deltas: dict[PlayerId, int] = field(default_factory=dict)
     ship_deaths: list[PlayerId] = field(default_factory=list)
     asteroids_to_spawn: list[tuple[Vec, Vec, str]] = field(default_factory=list)
+    powerups_to_apply: list[tuple[PowerUp, Ship]] = field(default_factory=list)
+    ufo_deaths: list[UFO] = field(default_factory=list)
 
 
 class CollisionManager:
@@ -29,6 +31,7 @@ class CollisionManager:
         bullets: pg.sprite.Group,
         asteroids: pg.sprite.Group,
         ufos: pg.sprite.Group,
+        powerups: pg.sprite.Group,
     ) -> CollisionResult:
         result = CollisionResult()
         self._bullets_vs_asteroids(bullets, asteroids, result)
@@ -36,6 +39,7 @@ class CollisionManager:
         self._ufo_vs_asteroids(ufos, asteroids, result)
         self._ship_vs_asteroids(ships, asteroids, result)
         self._ship_vs_ufo_bullets(ships, bullets, result)
+        self._ship_vs_powerup(ships, powerups, result)
         return result
 
     def _bullets_vs_asteroids(
@@ -81,6 +85,7 @@ class CollisionManager:
                     result.score_deltas[bullet.owner_id] = (
                         result.score_deltas.get(bullet.owner_id, 0) + score
                     )
+                    result.ufo_deaths.append(ufo)
                     ufo.kill()
                     bullet.kill()
                     result.events.append("ship_explosion")
@@ -138,6 +143,19 @@ class CollisionManager:
                     bullet.kill()
                     result.ship_deaths.append(ship.player_id)
                     return
+
+    def _ship_vs_powerup(
+        self,
+        ships: dict[PlayerId, Ship],
+        powerups: pg.sprite.Group,
+        result: CollisionResult,
+    ):
+        for ship in ships.values():
+            for powerup in list(powerups):
+                if pg.sprite.collide_rect(powerup, ship):
+                    result.powerups_to_apply.append((powerup, ship))
+                    result.events.append("powerup_got")
+                    powerup.kill()
 
     def _split_asteroid(
         self,
