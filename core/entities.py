@@ -16,18 +16,15 @@ UFO_BULLET_OWNER = -10
 
 
 class EnumPowerUps(Enum):
-    """File paths for power up images"""
+    """File paths for power up images."""
 
     ONE_UP = os.path.join(C.IMAGES_PATH, "One_Up.png")
 
     @classmethod
     def _missing_(cls, value):
-        # If not valid value, return MISSING
-        MISSING = os.path.join(C.IMAGES_PATH, "Missing.png")
-        for member in cls:
-            if member.value == value:
-                return member
-        return MISSING
+        # Unknown value: fall back to the first member rather than raising.
+        # (Enum._missing_ must return an Enum member or None.)
+        return next(iter(cls), None)
 
 
 def rotate_vec(v: Vec, deg: float) -> Vec:
@@ -111,7 +108,7 @@ class Ship(pg.sprite.Sprite):
         self.invuln = 0.0
         self.r = int(C.SHIP_RADIUS)
         self.shield_energy = float(C.SHIELD_MAX_ENERGY)
-        self.shield_activate = False
+        self.shield_active = False
         self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
 
         self.powerup = None
@@ -350,7 +347,7 @@ class UFO(pg.sprite.Sprite):
 
 
 class PowerUp(pg.sprite.Sprite):
-    """Initialize a Powerup"""
+    """Collectible power-up."""
 
     def __init__(self, pos: Vec, power_up_type: str):
         super().__init__()
@@ -358,28 +355,26 @@ class PowerUp(pg.sprite.Sprite):
         self.type = power_up_type
         self.image = pg.image.load(EnumPowerUps[self.type].value).convert_alpha()
         self.rect = self.image.get_rect()
-        self.rect.topleft = self.pos.x, self.pos.y
+        self.rect.topleft = (int(self.pos.x), int(self.pos.y))
         self.idle_time = 1
         self.state = "down"  # just for idle animation
 
     def update(self, dt: float):
-        """Animate the power up"""
+        """Animate the power up (gentle bob)."""
         if self.idle_time > 0:
             self.idle_time -= dt
+            return
 
-        else:
-            if self.state == "down":
-                self.pos.y -= 5
-                self.state = "up"
+        if self.state == "down":
+            self.pos.y -= 5
+            self.state = "up"
+        elif self.state == "up":
+            self.pos.y += 5
+            self.state = "down"
 
-            elif self.state == "up":
-                self.pos.y += 5
-                self.state = "down"
-
-            self.idle_time = 1
-
-            self.pos = wrap_pos(self.pos)
-            self.rect.topleft = self.pos
+        self.idle_time = 1
+        self.pos = wrap_pos(self.pos)
+        self.rect.topleft = (int(self.pos.x), int(self.pos.y))
 class BlackHole(pg.sprite.Sprite):
     """Black hole hazard.
 

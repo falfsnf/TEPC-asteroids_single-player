@@ -109,6 +109,7 @@ class World:
         pw_up = PowerUp(pos, power_up)
         self.powerups.add(pw_up)
         self.all_sprites.add(pw_up)
+
     def spawn_black_hole(self) -> None:
         """Spawn a black hole at a random position, not too close to ships."""
         ship_positions = [s.pos for s in self.ships.values()]
@@ -242,7 +243,12 @@ class World:
 
     def _handle_collisions(self) -> None:
         result = self._collision_mgr.resolve(
-            self.ships, self.bullets, self.asteroids, self.ufos, self.black_holes,  self.powerups
+            self.ships,
+            self.bullets,
+            self.asteroids,
+            self.ufos,
+            powerups=self.powerups,
+            black_holes=self.black_holes,
         )
 
         self.events.extend(result.events)
@@ -287,6 +293,7 @@ class World:
         if powerup_type == "ONE_UP":
             pid = ship.player_id
             self.lives[pid] += 1
+
     def _ship_die_instant(self, ship: Ship) -> None:
         """Instant Game Over: remaining lives are forfeit (black hole)."""
         pid = ship.player_id

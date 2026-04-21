@@ -32,7 +32,7 @@ class CollisionManager:
         bullets: pg.sprite.Group,
         asteroids: pg.sprite.Group,
         ufos: pg.sprite.Group,
-        powerups: pg.sprite.Group,
+        powerups: pg.sprite.Group | None = None,
         black_holes: pg.sprite.Group | None = None,
     ) -> CollisionResult:
         result = CollisionResult()
@@ -41,7 +41,8 @@ class CollisionManager:
         self._ufo_vs_asteroids(ufos, asteroids, result)
         self._ship_vs_asteroids(ships, asteroids, result)
         self._ship_vs_ufo_bullets(ships, bullets, result)
-        self._ship_vs_powerup(ships, powerups, result)
+        if powerups is not None:
+            self._ship_vs_powerup(ships, powerups, result)
         if black_holes is not None:
             self._ship_vs_black_holes(ships, black_holes, result)
         return result
@@ -164,6 +165,7 @@ class CollisionManager:
                     result.powerups_to_apply.append((powerup, ship))
                     result.events.append("powerup_got")
                     powerup.kill()
+
     def _ship_vs_black_holes(
         self,
         ships: dict[PlayerId, Ship],
