@@ -61,6 +61,7 @@ class Renderer:
 
         if ship is not None:
             self._draw_shield_bar(ship)
+            self._draw_shotgun_status(ship)
 
     def draw_menu(self) -> None:
         self._draw_text(
@@ -144,7 +145,6 @@ class Renderer:
     def _draw_black_hole(self, bh: BlackHole) -> None:
         center = (int(bh.pos.x), int(bh.pos.y))
 
-        # Faint outer influence ring (so the player sees the danger zone).
         pg.draw.circle(
             self.screen,
             (60, 60, 80),
@@ -153,23 +153,17 @@ class Renderer:
             width=1,
         )
 
-        # Pulsing accretion rings between influence and event horizon.
         t = bh.age
         for i in range(3):
             phase = (t * 0.6 + i * 0.33) % 1.0
             ring_r = int(bh.r + 6 + phase * (bh.influence_r - bh.r - 6) * 0.4)
-            # Fade as the ring expands outward.
             brightness = int(180 * (1.0 - phase))
             color = (brightness, brightness, min(255, brightness + 30))
             pg.draw.circle(self.screen, color, center, ring_r, width=1)
 
-        # Solid black disk (swallows what's behind it visually).
         pg.draw.circle(self.screen, self.config.BLACK, center, bh.r)
-
-        # Bright event-horizon ring.
         pg.draw.circle(self.screen, self.config.WHITE, center, bh.r, width=2)
 
-        # Inner swirl: a small rotating tick mark to give it motion.
         ang = t * 4.0
         inner_r = max(2, bh.r // 2)
         tip = (
@@ -192,7 +186,7 @@ class Renderer:
 
     def _draw_powerup(self, powerup: PowerUp):
         draw_image(self.screen, powerup.pos, powerup.image)
-        # pg.draw.rect(surf, C.WHITE, self.rect, width=1)
+
     def _draw_shield_bar(self, ship) -> None:
         bar_x      = 10
         bar_y      = 36        
@@ -215,3 +209,17 @@ class Renderer:
 
         label = self.font.render("SH", True, self.config.WHITE)
         self.screen.blit(label, (bar_x + bar_width + 6, bar_y - 4))
+
+    def _draw_shotgun_status(self, ship) -> None:
+        x = 200
+        y = 34
+
+        if ship.shotgun_active:
+            text = "SHOTGUN ACTIVE"
+        elif ship.shotgun_available:
+            text = "SHOTGUN AVAILABLE"
+        else:
+            text = "SHOTGUN USED"
+
+        label = self.font.render(text, True, self.config.WHITE)
+        self.screen.blit(label, (x, y))
